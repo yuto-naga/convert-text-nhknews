@@ -18,6 +18,9 @@ NHK_BASE_URL = "https://www3.nhk.or.jp"
 # NHKアクセスランキングURL
 NHK_ACCESS_RANKING_URL = NHK_BASE_URL + "/news/ranking/access.html"
 
+# NHKソーシャルランキングURL
+NHK_SOCIAL_RANKING_URL = NHK_BASE_URL + "/news/ranking/social.html"
+
 # 記事タイトルから取得しないワードのリスト
 NOT_INTEREST_WORDS = ["駅伝"]
 
@@ -44,10 +47,9 @@ def is_include_not_interest(anchor):
     return any(not_interest_word in anchor.find("em").text for not_interest_word in NOT_INTEREST_WORDS)
 
 
-# NHKのアクセスランキングからURLを取得する
-def get_urls():
-    logging.info("NHKアクセスランキングから記事URLを取得します")
-    driver.get(NHK_ACCESS_RANKING_URL)
+# 指定したURLからaタグ(記事URL)リストを取得
+def get_anchors(ranking_url):
+    driver.get(ranking_url)
     # 定義した上条件で待機する(最大20秒)
     wait = WebDriverWait(driver, 20)
     # NAMEで指定したページ上の要素が読み込まれるまで待機
@@ -57,12 +59,32 @@ def get_urls():
 
     # アクセスランキングの範囲を対象に抽出
     section = soup.find("section", class_="content--items")
-    # アクセスランキングのaタグを抽出
-    anchor_list = section.find_all("a")
+    return section.find_all("a")
+
+
+# NHKのアクセスランキングからURLを取得する
+def get_urls():
+    logging.info("NHKソーシャル・アクセスランキングから記事URLを取得します")
+    # ソーシャルランキングからaタグ(記事URL)を取得
+    social_anchor_list = get_anchors(NHK_SOCIAL_RANKING_URL)
+    # 連続してアクセスするので間隔を空ける
+    time.sleep(3)
+    # アクセスランキングからaタグ(記事URL)を取得
+    access_anchor_list = get_anchors(NHK_ACCESS_RANKING_URL)
 
     # フィルタしながらURL部分を抽出
-    return map(lambda anchor: NHK_BASE_URL + anchor.get("href"),
-               itertools.filterfalse(is_include_not_interest, anchor_list))
+    return set(
+        list(
+            map(lambda anchor: NHK_BASE_URL + anchor.get("href"),
+                itertools.filterfalse(is_include_not_interest, access_anchor_list)
+                )
+        ) +
+        list(
+            map(lambda anchor: NHK_BASE_URL + anchor.get("href"),
+                itertools.filterfalse(is_include_not_interest, social_anchor_list)
+                )
+        )
+    )
 
 
 # 記事内容を取得する
@@ -94,7 +116,7 @@ def get_article(target_url):
     # HTMLを文字コードをUTF-8に変換してから取得します。
     html = driver.page_source.encode('UTF-8')
 
-    # htmlをBeutifulSoapで扱う
+    # htmlをBeautifulSoupで扱う
     soup = BeautifulSoup(html, "html.parser")
 
     # タイトルを抽出
