@@ -123,20 +123,22 @@ def get_article(target_url):
     contexts.append(title)
 
     # サマリを抽出
-    contexts.append("~~要約~~")
     summary_contents = soup.find_all(class_=["content--summary", "content--summary-more"])
-    for summary in summary_contents:
-        contexts.append(convert_punctuation(summary.text))
+    if summary_contents:
+        contexts.append("~~要約~~")
+        for summary in summary_contents:
+            contexts.append(convert_punctuation(summary.text))
 
     # 本文を抽出
-    contexts.append("~~内容~~")
     detail_contents = soup.find_all(class_=["body-title", "body-text"])
-    for detail_content in detail_contents:
-        match detail_content['class']:
-            case ["body-title"]:
-                contexts.append(convert_punctuation(detail_content.text))
-            case ["body-text"]:
-                contexts.append(convert_punctuation(detail_content.text))
+    if detail_contents:
+        contexts.append("~~内容~~")
+        for detail_content in detail_contents:
+            match detail_content['class']:
+                case ["body-title"]:
+                    contexts.append(convert_punctuation(detail_content.text))
+                case ["body-text"]:
+                    contexts.append(convert_punctuation(detail_content.text))
 
     return {title: '\n'.join(contexts)}
 
