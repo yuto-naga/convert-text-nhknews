@@ -25,7 +25,7 @@ NHK_SOCIAL_RANKING_URL = NHK_BASE_URL + "/news/ranking/social.html"
 NOT_INTEREST_WORDS = ["駅伝"]
 
 # Output
-OUTPUT_DIRECTORY = "outputs"
+OUTPUT_BASE_DIRECTORY = "outputs/"
 LOG_DIRECTORY = "logs"
 
 
@@ -61,7 +61,6 @@ def get_anchors(ranking_url):
     section = soup.find("section", class_="content--items")
     return section.find_all("a")
 
-
 # NHKのアクセスランキングからURLを取得する
 def get_urls():
     logging.info("NHKソーシャル・アクセスランキングから記事URLを取得します")
@@ -85,7 +84,6 @@ def get_urls():
                 )
         )
     )
-
 
 # 記事内容を取得する
 def get_article(target_url):
@@ -121,7 +119,8 @@ def get_article(target_url):
 
     # タイトルを抽出
     contexts.append("~~タイトル~~")
-    contexts.append(re.sub('\n', '', soup.find("h1").text))
+    title = re.sub('\n', '', soup.find("h1").text)
+    contexts.append(title)
 
     # サマリを抽出
     contexts.append("~~要約~~")
@@ -139,29 +138,28 @@ def get_article(target_url):
             case ["body-text"]:
                 contexts.append(convert_punctuation(detail_content.text))
 
-    return contexts
-
+    return {title: '\n'.join(contexts)}
 
 # テキストファイル化
-def convert_text(news_list):
+def convert_text(news_dict_list):
     logging.info("記事をテキストファイルに変換します")
-    date = datetime.now().strftime('%Y_%m_%d_%H_%M')
+    date = datetime.now().strftime('%Y%m%d')
 
     # 「outputs」ディレクトリ作成(すでにあってもOK)
-    os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
+    os.makedirs(OUTPUT_BASE_DIRECTORY + date, exist_ok=True)
 
-    # テキストファイルを出力する
-    path_w = OUTPUT_DIRECTORY + '/NHKニュース_' + date + '.txt'
+    for index, (title, content) in enumerate(news_dict_list.items()):
+        # テキストファイルを出力する
+        file_path = OUTPUT_BASE_DIRECTORY + date + '/' + str(index + 1) + '_' + title + '.txt'
 
-    # 書き込み(新規作成のみ)
-    try:
-        # with-as文をつかうことで、ファイルのcloseする必要がなくなる
-        with open(path_w, mode='x') as f:
-            f.write('\n'.join(news_list))
-    except FileExistsError:
-        print("#すでにファイルが存在しています。: " + path_w)
-        pass
-
+        # 書き込み(新規作成のみ)
+        try:
+            # with-as文をつかうことで、ファイルのcloseする必要がなくなる
+            with open(file_path, mode='x') as f:
+                f.write(content)
+        except FileExistsError:
+            print("#すでにファイルが存在しています。: " + file_path)
+            pass
 
 # ログ初期化
 log_init()
@@ -183,13 +181,12 @@ try:
     url_list = get_urls()
 
     # 記事一覧URLから記事内容を取得してリストに格納
-    news_list = []
-    for index, url in enumerate(url_list):
-        news_list.append(str(index + 1) + "番目のニュースです。")
-        news_list.extend(get_article(url))
+    news_dicts = {}
+    for url in url_list:
+        news_dicts.update(get_article(url))
 
     # テキストファイル化
-    convert_text(news_list)
+    convert_text(news_dicts)
 
 except Exception as e:
     logging.error(f'caught {type(e)}: {str(e)}')
